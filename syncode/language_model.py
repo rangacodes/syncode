@@ -82,7 +82,7 @@ class HuggingFaceModel:
         Args:
             prompt (str): The prompt for which completions are generated.
             batch_size (int): The number of completions to generate.
-            stop_words (list): A list of stop words. If the completion ends with any of the stop words, the completion is returned.
+            stop_words (str): A list of comma seperated stop words. If the completion ends with any of the stop words, the completion is returned.
             return_token_ids (bool): If True, returns the token ids of the completions.
             debug (bool): If True, prints debug information.
         '''        
@@ -103,6 +103,7 @@ class HuggingFaceModel:
 
         # Create stopping criteria
         if stop_words is not None:
+            stop_words=stop_words.split(', ')
             stop_criteria = StoppingCriteriaList([KeywordsStoppingCriteria(self.tokenizer, stop_words=stop_words)])
         else:
             stop_criteria = []

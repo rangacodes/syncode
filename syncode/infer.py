@@ -15,12 +15,12 @@ from syncode.evaluation.json_eval import JSONEval
 from syncode.evaluation.fol_eval import FOLEval
 
 
-def compile_and_run(model, mode="grammar_strict", quantize=True, device="cuda", grammar=None, dataset="input", num_few_shot=0, dev_mode=False, log_level=1, new_mask_store=False, parser="lalr", num_tasks=None, task_id=None, seed=None, opp=True, debug=False, **kwargs):
+def compile_and_run(model, mode="grammar_strict", quantize=True, device="cuda", grammar=None, dataset="input", num_few_shot=0, dev_mode=False, log_level=1, new_mask_store=False, parser="lalr", num_tasks=None, task_id=None, seed=None, opp=True, debug=False, stop_words=None, **kwargs):
 
-    syncode = Syncode(model, mode=mode, quantize=quantize, device=device, grammar=grammar, dev_mode=dev_mode, log_level=log_level, new_mask_store=new_mask_store, parser=parser, seed=seed, opp=opp, **kwargs)
+    syncode = Syncode(model, mode=mode, quantize=quantize, device=device, grammar=grammar, dev_mode=dev_mode, log_level=log_level, new_mask_store=new_mask_store, parser=parser, seed=seed, opp=opp, stop_words=stop_words, **kwargs)
     
     if dataset == "input":
-        syncode.infer(debug=debug)
+        syncode.infer(debug=debug, stop_words=stop_words)
     else:
         # Setup output directory and logger
         num_samples = kwargs.get('num_return_sequences', 1)
@@ -60,6 +60,8 @@ class Syncode:
         log_level (int, optional): Log level. Defaults to 2. 0 for no logs, 1 for minimal logs, 2 for all logs including time.
         
         opp (bool, optional): Whether to use opportunistic generation. Defaults to True.
+
+        stop_words (string, optional): Stop words to use, entered as a comma seperated list in the form of a single string. Defaults to None.
     """
     def __init__(
         self, 
@@ -75,6 +77,7 @@ class Syncode:
         parser: Literal["lr", "lalr"] = "lalr",
         seed: Optional[int] = None,
         opp: bool = True,
+        stop_words: Optional[str] = None,
         **kwargs
     ):  
         # Check inputs
@@ -92,6 +95,7 @@ class Syncode:
         self.new_mask_store = new_mask_store
         self.parser = parser
         self.log_level = log_level
+        self.stop_words = stop_words
 
         # Set seed
         if seed is not None:
@@ -195,7 +199,7 @@ class Syncode:
 
         Args:
             prompt (str): User input prompt
-            stop_words (list, optional): Stop words to use. Defaults to None.
+            stop_words (str, optional): Stop words to use, entered as a comma seperated list in the form of a single string. Defaults to None.
             debug (bool, optional): Debug mode. Defaults to False.
         """
         if prompt:      
@@ -206,11 +210,11 @@ class Syncode:
         else:
             while True:
                 prompt = input('Enter prompt: ')
-                prompt = prompt.replace('\\n', '\n').replace('\\"', '\"').replace('\\t', '\t').replace("\\'", "\'").replace('\\b', '\b').replace('\\r', '\r') if self.grammar.name == 'python' else prompt
+                prompt = prompt.replace('\\n', '\n').replace('\\"', '\"').replace('\\t', '\t').replace("\\'", "\'").replace('\\b', '\b').replace('\\r', '\r') if self.grammar is not None and self.grammar.name == 'python' else prompt
                 if prompt == "exit":
                     break
 
-                batch_completions = self.model.generate_grammar_constrained_completion(prompt, self.num_samples)
+                batch_completions = self.model.generate_grammar_constrained_completion(prompt, self.num_samples, stop_words=stop_words)
                 for i, completion in enumerate(batch_completions):
                     print(prompt + completion)
 
