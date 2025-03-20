@@ -1,0 +1,176 @@
+// Following https://www.verilog.com/VerilogBNF.html and verilog grammar reference manual https://www.eg.bucknell.edu/~csci320/2016-fall/wp-content/uploads/2015/08/verilog-std-1364-2005.pdf
+
+// 1. Source Text
+start: description //* // generating only one module for now for simplicity
+
+?description: module
+
+module:  "module" name_of_module list_of_port_declarations? ";" non_port_module_item* "endmodule" // "<|endoftext|>"
+          // | "module" name_of_module list_of_ports? ";" module_item* "endmodule"
+
+?name_of_module: IDENTIFIER
+
+list_of_ports: "(" port ("," port)* ")"
+list_of_port_declarations: "(" port_declaration ("," port_declaration)* ")"
+                         | "("")"
+
+?port: port_expression
+     | "." port_identifier "(" port_expression? ")"
+
+port_expression: port_reference
+               | "{" port_reference ("," port_reference)* "}"
+
+port_reference: name_of_variable ("[" constant_range_expression "]")?
+
+// 2. Declarations
+port_declaration: input_declaration | output_declaration
+
+input_declaration: input net_type? signed? range? port_identifier //list_of_port_identifiers
+output_declaration: output net_type? signed? range? port_identifier //list_of_port_identifiers
+               |    output reg signed? range? port_identifier
+
+signed: "signed"
+reg.2: "reg"
+net_type.2: "supply0" | "supply1" | "tri" | "triand" | "trior" | "tri0" | "tri1" | "uwire" | "wire" | "wand" | "wor"
+// list_of_port_identifiers: port_identifier ("," port_identifier)*
+
+port_identifier.2: IDENTIFIER
+name_of_variable: IDENTIFIER
+input.2: "input"
+output.2: "output"
+
+reg_declaration: "reg" range? list_of_register_variables ";"
+
+list_of_register_variables: register_variable ("," register_variable)*
+register_variable: name_of_register | name_of_memory "[" constant_expression ":" constant_expression "]"
+
+name_of_register: identifier
+name_of_memory: identifier
+// module definition
+
+// module_item: "// comment"
+non_port_module_item: reg_declaration 
+                    | always_statement
+                    | continuous_assign 
+                    | parameter_declaration
+                    | "// comment"
+
+always_statement: "always" statement
+
+statement: nonblocking_assignment ";"
+          | blocking_assignment ";"
+          | "if" "(" expression ")" statement_or_null ("else" statement_or_null)?
+          | delay_or_event_control statement_or_null
+          | seq_block
+          | "case" "(" expression ")" case_item+ "endcase"
+
+blocking_assignment: variable_lvalue "=" delay_or_event_control? expression
+nonblocking_assignment: variable_lvalue "<="  delay_or_event_control? expression
+delay_or_event_control: delay_control | event_control | "repeat" "(" expression ")" event_control
+event_control: "@" "("event_expression")" | "@" identifier | "@" "*" | "@" "(" "*" ")"
+delay_control: "#" number | "#" identifier | "#" "(" mintypmax_expression ")"
+seq_block: "begin" statement* "end"
+
+case_item: expression ("," expression)* ":" statement_or_null
+          | "default" ":" statement_or_null
+          | "default" statement_or_null
+
+continuous_assign: "assign" list_of_assignments ";"
+list_of_assignments: assignment ("," assignment)*
+assignment: lvalue "=" expression
+
+parameter_declaration: "parameter" list_of_parameter_assignments ";"
+list_of_parameter_assignments: parameter_assignment ("," parameter_assignment)*
+parameter_assignment: identifier "=" constant_expression
+
+statement_or_null: statement | ";"
+
+// 7. Expressions
+
+variable_lvalue: lvalue
+
+event_expression : expression  | "posedge" expression | "negedge" expression | event_expression "or" event_expression
+
+constant_range_expression: constant_expression
+                         | msb_constant_expression ":" lsb_constant_expression
+range: "[" msb_constant_expression ":" lsb_constant_expression "]"
+msb_constant_expression: constant_expression
+lsb_constant_expression: constant_expression
+constant_expression: expression
+
+mintypmax_expression: expression | expression ":" expression ":" expression
+
+expression: primary
+          | unary_operator primary
+          | expression binary_operator expression
+          | expression "?" expression ":" expression
+
+unary_operator:  "+" | "-" | "!" | "~" | "&" | "~&" | "|" | "~|" | "^" | "~^" | "^~"
+binary_operator: "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "===" | "!==" | "&&" | "||" | "**" | "<" | "<=" | ">" | ">=" | "&" | "|" | "^" | "^~" | "~^" | "<<" | ">>" | ">>>" | "<<<"
+
+lvalue: identifier
+          | identifier "[" expression "]"
+          | identifier "[" constant_expression ":" constant_expression "]" 
+          | concatenation
+
+primary: number
+          | identifier
+          | identifier "[" expression "]"
+          | identifier "[" constant_expression ":" constant_expression "]" 
+          | concatenation
+          | multiple_concatenation
+          // | function_call
+          | "(" mintypmax_expression")"
+
+concatenation: "{" expression ("," expression)* "}"
+multiple_concatenation: "{" expression "{" expression ("," expression)* "}" "}"
+
+number: decimal_number | octal_number | binary_number | hex_number | real_number
+real_number: unsigned_number "." unsigned_number | unsigned_number "." unsigned_number exp sign? unsigned_number
+exp: "e" | "E"
+
+decimal_number: unsigned_number // DECIMAL_NUMBER
+               | size? decimal_base unsigned_number
+               | size? decimal_base x_digit "_"*
+               | size? decimal_base z_digit "_"*
+          // // | unsigned_number? base unsigned_number
+          // | decimal_number"."unsigned_number
+          // | decimal_number("."unsigned_number)?"E"decimal_number
+          // | decimal_number("."unsigned_number)?"e"decimal_number
+
+binary_number: size? binary_base binary_value
+octal_number: size? octal_base octal_value
+hex_number: size? hex_base hex_value
+
+sign: "+" | "-"
+size:  /[1-9][0-9_]*/
+
+binary_value: binary_digit (binary_digit | "_")*
+octal_value: octal_digit (octal_digit | "_")*
+hex_value: hex_digit (hex_digit | "_")*
+
+decimal_base: "'" ("s"|"S")? ("d"|"D") //should not work with whitespaces in between them!
+binary_base: "'" ("s"|"S")? ("b"|"B")
+octal_base: "'" ("s"|"S")? ("o"|"O")
+hex_base: "'" ("s"|"S")? ("h"|"H")
+
+decimal_digit: /[0-9]/
+non_zero_decimal_digit: /[1-9]/
+binary_digit: /[01xXzZ]/
+octal_digit: /[0-7xXzZ]/
+hex_digit: /[0-9a-fA-FxXzZ]/
+x_digit: "x" | "X"
+z_digit: "z" | "Z"
+unsigned_number: UNSIGNED_NUMBER
+
+// DECIMAL_NUMBER: ("-")?/[0-9_]+/ //"+"| it should be plus or minus and then digits
+UNSIGNED_NUMBER: /[0-9][0-9_]*/
+
+identifier: IDENTIFIER
+IDENTIFIER: CNAME
+
+%import common.CNAME
+%import common.ESCAPED_STRING
+%import common.WS
+
+%ignore WS

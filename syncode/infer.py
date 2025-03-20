@@ -47,7 +47,7 @@ class Syncode:
         num_samples (int, optional): Number of samples. Defaults to 1.
         
         grammar (str, optional): Language. Defaults to "input". "input" is used for user input. 
-            other options currently supported are "python", "go", "calc", "sql", "json", "fol".
+            other options currently supported are "python", "go", "calc", "sql", "json", "fol", "verilog".
         
         parser (str, optional): Parser to use. Defaults to "lalr".
         
